@@ -1,0 +1,7 @@
+ImageHash==4.3.1
+openpyxl==3.1.5
+Pillow==11.0.0
+pyshp==2.3.1
+torch==2.5.0
+torchvision==0.20.0
+tqdm==4.67.1
