@@ -32,7 +32,8 @@ def parse_args():
     parser.add_argument('--detection_model', required=False, help='Name of detection model, must match the model name in Pytorch identically')
     parser.add_argument('--detection_model_path', required=False, help='Path to the model .pth file')
     parser.add_argument('--detection_class_number', type=int, required=False, help='Class number to identify species')
-    parser.add_argument('--db_path', required=False, help='Path to the distribution database, is absent, distribution filter will not be applied')
+    parser.add_argument('--db_path', required=False, help='Path to the distribution database, if this param and --species_list are both absent, distribution filter will not be applied')
+    parser.add_argument('--species_list', required=False, help='Path to the local species list, if this param and db_path are both absent, distribution filter will not be applied')
     parser.add_argument('--clasification_threshold', type=float, default=0.85, help='Confidence threshold for classification')
     parser.add_argument('--detection_threshold', type=float, default=0.85, help='Confidence threshold for detection')
     parser.add_argument('--detection_target', type=int, help='Target class for detection')
@@ -93,7 +94,7 @@ def detect_objects(detection_model, image_tensor, detection_target):
     return boxes, scores
 
 
-def read_label_list(file_path):
+def read_lines(file_path):
     if not file_path:
         file_path = './labels.txt'
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -192,11 +193,14 @@ def main():
     classification_model = load_classification_model(args.classification_model, args.class_number, args.model_path)
     detection_model = load_detection_model(args.detection_model, args.detection_class_number, args.detection_model_path, args.detection_threshold)
 
-    db, species_list = None, None
+    species_list = None, None
     if args.db_path and args.location:
+        species_list = read_lines(args.db_path)
+    elif args.db_path and args.location:
         lat, lng = map(float, args.location.split(','))
         db = DistributionDB(args.db_path)
         species_list = db.get_list(lat, lng)
+        db.close()
 
     if not os.path.exists(args.output_folder):
         os.makedirs(args.output_folder)
@@ -208,14 +212,11 @@ def main():
         image_path = os.path.join(args.input_folder, image_name)
         image_tensor, original_image = preprocess_image(image_path)
         boxes, scores = detect_objects(detection_model, image_tensor, args.detection_target)
-        label_map = read_label_list(args.label_path)
+        label_map = read_lines(args.label_path)
 
         results = classify_objects(classification_model, original_image, boxes, label_map, species_list)
 
         save_results(original_image, results, args.output_folder, args.clasification_threshold, image_name)
-
-    if db:
-        db.close()
 
 
 
